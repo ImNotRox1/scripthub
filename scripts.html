@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Nexus Hub - Script Sharing Platform">
+    <title>Nexus Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content">
+            <a href="home.html" class="logo">
+                <i class="fas fa-code"></i>
+                Nexus
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="scripts.html" class="nav-link">Scripts</a>
+                <a href="docs.html" class="nav-link">Documentation</a>
+                <a href="https://discord.gg/nexus" class="nav-link">Discord</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="scripts-header">
+        <div class="category-filters">
+            <button class="filter-button active"><span>All Scripts</span></button>
+            <button class="filter-button"><span>Auto Farm</span></button>
+            <button class="filter-button"><span>PvP</span></button>
+            <button class="filter-button"><span>UI Libraries</span></button>
+            <button class="filter-button"><span>Utilities</span></button>
+            <button class="filter-button"><span>Admin</span></button>
+        </div>
+
+        <div class="scripts-container">
+            <div class="scripts-grid">
+                <!-- Upload Card -->
+                <div class="upload-card" onclick="window.location.href='upload.html'">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Upload Your Script</h3>
+                    <p>Share your scripts with the community. Click here to get started.</p>
+                </div>
+                <!-- Script cards will be dynamically loaded here -->
+            </div>
+
+            <div class="pagination">
+                <button class="page-button active"><span>1</span></button>
+                <button class="page-button"><span>2</span></button>
+                <button class="page-button"><span>3</span></button>
+                <button class="page-button"><span><i class="fas fa-ellipsis-h"></i></span></button>
+                <button class="page-button"><span>10</span></button>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // Script card template
+        const scriptCardTemplate = (script, index) => {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const showActions = currentUser && script.authorId === currentUser.id;
+            
+            return `
+                <div class="script-card">
+                    <div class="script-header">
+                        <div class="script-thumbnail">
+                            ${script.thumbnail ? `
+                                <img src="${script.thumbnail}" alt="${script.title}" />
+                                <div class="overlay"></div>
+                            ` : `
+                                <div class="no-thumbnail">
+                                    <i class="fas fa-code"></i>
+                                </div>
+                            `}
+                        </div>
+                        <div class="script-info">
+                            <div class="script-title">
+                                <i class="${script.icon}"></i>
+                                ${script.title}
+                                <span class="tag">${script.tag}</span>
+                            </div>
+                            <div class="script-stats">
+                                <span><i class="fas fa-star"></i> ${script.rating}</span>
+                                <span><i class="fas fa-download"></i> ${script.downloads}</span>
+                            </div>
+                        </div>
+                        <p class="script-description">${script.description}</p>
+                    </div>
+                    
+                    <div class="script-content">
+                        <div class="code-block">
+                            ${script.code}
+                            <button class="copy-button" onclick="event.stopPropagation(); copyCode(this)" title="Copy script">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="script-meta">
+                            <div><i class="fas fa-user"></i> By ${script.author}</div>
+                            <div><i class="fas fa-clock"></i> Updated ${script.updated}</div>
+                        </div>
+                        
+                        ${showActions ? `
+                            <div class="script-actions">
+                                <button type="button" class="edit-btn" onclick="event.stopPropagation(); handleScriptAction('edit', '${script.id || index}')" title="Edit script">
+                                    <i class="fas fa-edit"></i>
+                                    <span>Edit</span>
+                                </button>
+                                <button type="button" class="delete-btn" onclick="event.stopPropagation(); handleScriptAction('delete', '${script.id || index}')" title="Delete script">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Delete</span>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        };
+
+        // Load scripts from localStorage or use default scripts if none exist
+        const defaultScripts = [
+            {
+                id: '1',
+                icon: 'fas fa-robot',
+                title: 'Universal Auto Farm',
+                tag: 'Premium',
+                rating: '4.9',
+                downloads: '10.2k',
+                description: 'Advanced auto farming script with multi-game support and anti-detection features.',
+                code: 'loadstring(game:HttpGet(\'https://nexus.com/scripts/autofarm.lua\'))()',
+                author: 'NexusDev',
+                authorId: 'system',
+                updated: '1h ago',
+                categories: ['Auto Farm'],
+                thumbnail: 'https://your-default-thumbnail-url.jpg'
+            }
+            // ... other default scripts ...
+        ];
+
+        let allScripts = JSON.parse(localStorage.getItem('nexusScripts')) || defaultScripts;
+
+        const SCRIPTS_PER_PAGE = 9;
+        let currentPage = 1;
+
+        function displayScripts(page, filter = 'All Scripts') {
+            const scriptsGrid = document.querySelector('.scripts-grid');
+            const filteredScripts = filter === 'All Scripts' 
+                ? allScripts 
+                : allScripts.filter(script => script.categories?.includes(filter));
+            
+            const startIndex = (page - 1) * SCRIPTS_PER_PAGE;
+            const endIndex = startIndex + SCRIPTS_PER_PAGE;
+            const scriptsToShow = filteredScripts.slice(startIndex, endIndex);
+
+            // Add upload card first, then the scripts
+            scriptsGrid.innerHTML = `
+                <div class="upload-card" onclick="window.location.href='upload.html'">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <h3>Upload Your Script</h3>
+                    <p>Share your scripts with the community. Click here to get started.</p>
+                </div>
+                ${scriptsToShow.map(script => scriptCardTemplate(script)).join('')}
+            `;
+
+            updatePagination(page, Math.ceil(filteredScripts.length / SCRIPTS_PER_PAGE));
+        }
+
+        function updatePagination(page, totalPages) {
+            const pagination = document.querySelector('.pagination');
+            let paginationHTML = '';
+
+            // First page
+            paginationHTML += `<button class="page-button ${page === 1 ? 'active' : ''}" onclick="changePage(1)"><span>1</span></button>`;
+
+            // Middle pages
+            if (totalPages > 5) {
+                if (page > 3) {
+                    paginationHTML += `<button class="page-button"><span>...</span></button>`;
+                }
+                
+                for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+                    paginationHTML += `<button class="page-button ${page === i ? 'active' : ''}" onclick="changePage(${i})"><span>${i}</span></button>`;
+                }
+                
+                if (page < totalPages - 2) {
+                    paginationHTML += `<button class="page-button"><span>...</span></button>`;
+                }
+            } else {
+                for (let i = 2; i < totalPages; i++) {
+                    paginationHTML += `<button class="page-button ${page === i ? 'active' : ''}" onclick="changePage(${i})"><span>${i}</span></button>`;
+                }
+            }
+
+            // Last page
+            if (totalPages > 1) {
+                paginationHTML += `<button class="page-button ${page === totalPages ? 'active' : ''}" onclick="changePage(${totalPages})"><span>${totalPages}</span></button>`;
+            }
+
+            pagination.innerHTML = paginationHTML;
+        }
+
+        function changePage(newPage) {
+            currentPage = newPage;
+            displayScripts(currentPage);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function copyCode(button) {
+            const codeBlock = button.parentElement;
+            const codeText = codeBlock.textContent.replace('copy', '').trim();
+            
+            navigator.clipboard.writeText(codeText).then(() => {
+                const originalHTML = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i>';
+                button.style.background = 'var(--success)';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHTML;
+                    button.style.background = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                button.innerHTML = '<i class="fas fa-times"></i>';
+                button.style.background = 'var(--error)';
+                
+                setTimeout(() => {
+                    button.innerHTML = '<i class="fas fa-copy"></i>';
+                    button.style.background = '';
+                }, 2000);
+            });
+        }
+
+        // Add filter functionality
+        const filterButtons = document.querySelectorAll('.filter-button');
+        filterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                currentPage = 1;
+                displayScripts(currentPage, button.textContent.trim());
+            });
+        });
+
+        // Initialize the page with all scripts
+        displayScripts(currentPage);
+
+        // Add smooth scrolling for better UX
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Add user check to edit and delete functions
+        function handleScriptAction(action, scriptId) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (!currentUser) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const scripts = JSON.parse(localStorage.getItem('nexusScripts') || '[]');
+            const script = scripts.find(s => s.id === scriptId.toString());
+            
+            if (!script) {
+                alert('Script not found');
+                return;
+            }
+
+            if (script.authorId !== currentUser.id) {
+                alert(`You can only ${action} your own scripts`);
+                return;
+            }
+
+            if (action === 'edit') {
+                localStorage.setItem('editingScript', JSON.stringify(script));
+                window.location.href = 'upload.html?mode=edit';
+            } else if (action === 'delete') {
+                showDeleteConfirmation(scriptId);
+            }
+        }
+
+        function showDeleteConfirmation(scriptId) {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            
+            // Create modal content
+            const modal = document.createElement('div');
+            modal.className = 'delete-modal';
+            modal.innerHTML = `
+                <h3>Delete Script</h3>
+                <p>Are you sure you want to delete this script? This action cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+                    <button class="confirm-delete-btn" onclick="confirmDelete('${scriptId}')">Delete</button>
+                </div>
+            `;
+            
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+        }
+
+        function closeDeleteModal() {
+            const overlay = document.querySelector('.modal-overlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+
+        function confirmDelete(scriptId) {
+            const scripts = JSON.parse(localStorage.getItem('nexusScripts') || '[]');
+            const scriptIndex = scripts.findIndex(s => s.id === scriptId.toString());
+            
+            if (scriptIndex !== -1) {
+                scripts.splice(scriptIndex, 1);
+                localStorage.setItem('nexusScripts', JSON.stringify(scripts));
+                allScripts = scripts;
+                
+                // Update pagination if needed
+                const totalPages = Math.ceil(scripts.length / SCRIPTS_PER_PAGE);
+                if (currentPage > totalPages && currentPage > 1) {
+                    currentPage--;
+                }
+                
+                displayScripts(currentPage);
+            }
+            
+            closeDeleteModal();
+        }
+    </script>
+</body>
+</html>
