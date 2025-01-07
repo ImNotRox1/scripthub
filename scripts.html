@@ -57,6 +57,9 @@
     </section>
 
     <script>
+        const API_KEY = '$2a$10$PIat0yPGQfS1MfmhZOBQJeb5ROobOzIRO8NqPczmmp416Sn0kCkni';
+        const BIN_ID = '677d2e61ad19ca34f8e6fee6';
+
         // Script card template
         const scriptCardTemplate = (script, index) => {
             const currentUser = JSON.parse(localStorage.getItem('currentUser'));
@@ -316,16 +319,15 @@
             }
         }
 
-        function confirmDelete(scriptId) {
-            const scripts = JSON.parse(localStorage.getItem('nexusScripts') || '[]');
+        async function confirmDelete(scriptId) {
+            const scripts = [...allScripts];
             const scriptIndex = scripts.findIndex(s => s.id === scriptId.toString());
             
             if (scriptIndex !== -1) {
                 scripts.splice(scriptIndex, 1);
-                localStorage.setItem('nexusScripts', JSON.stringify(scripts));
+                await saveScripts(scripts);
                 allScripts = scripts;
                 
-                // Update pagination if needed
                 const totalPages = Math.ceil(scripts.length / SCRIPTS_PER_PAGE);
                 if (currentPage > totalPages && currentPage > 1) {
                     currentPage--;
@@ -336,6 +338,43 @@
             
             closeDeleteModal();
         }
+
+        async function loadScripts() {
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                const data = await response.json();
+                allScripts = data.record.scripts || defaultScripts;
+                displayScripts(currentPage);
+            } catch (error) {
+                console.error('Error loading scripts:', error);
+                allScripts = defaultScripts;
+                displayScripts(currentPage);
+            }
+        }
+
+        async function saveScripts(scripts) {
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify({ scripts })
+                });
+            } catch (error) {
+                console.error('Error saving scripts:', error);
+            }
+        }
+
+        // Call loadScripts when page loads
+        window.addEventListener('load', () => {
+            loadScripts();
+        });
     </script>
 </body>
 </html>
