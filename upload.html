@@ -295,6 +295,9 @@
     </div>
 
     <script>
+        const API_KEY = '$2a$10$PIat0yPGQfS1MfmhZOBQJeb5ROobOzIRO8NqPczmmp416Sn0kCkni';
+        const BIN_ID = '677d2e61ad19ca34f8e6fee6';
+
         // Live preview functionality
         const scriptName = document.getElementById('scriptName');
         const description = document.getElementById('description');
@@ -336,7 +339,7 @@
         });
 
         // Form submission
-        document.getElementById('uploadForm').addEventListener('submit', (e) => {
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const currentUser = JSON.parse(localStorage.getItem('currentUser'));
@@ -361,22 +364,33 @@
                 thumbnail: document.getElementById('thumbnailUrl').value.trim() || null
             };
 
-            const scripts = JSON.parse(localStorage.getItem('nexusScripts') || '[]');
-            
-            if (editMode) {
-                const editingScript = JSON.parse(localStorage.getItem('editingScript'));
-                const scriptIndex = scripts.findIndex(s => s.id === editingScript.id);
-                
-                if (scriptIndex !== -1) {
-                    scripts[scriptIndex] = scriptData;
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+                const data = await response.json();
+                const scripts = data.record.scripts || [];
+
+                if (editMode) {
+                    const editingScript = JSON.parse(localStorage.getItem('editingScript'));
+                    const scriptIndex = scripts.findIndex(s => s.id === editingScript.id);
+                    
+                    if (scriptIndex !== -1) {
+                        scripts[scriptIndex] = scriptData;
+                    }
+                    localStorage.removeItem('editingScript');
+                } else {
+                    scripts.push(scriptData);
                 }
-                localStorage.removeItem('editingScript');
-            } else {
-                scripts.push(scriptData);
+
+                await saveScripts(scripts);
+                window.location.href = 'scripts.html';
+            } catch (error) {
+                console.error('Error saving script:', error);
+                alert('Error saving script. Please try again.');
             }
-            
-            localStorage.setItem('nexusScripts', JSON.stringify(scripts));
-            window.location.href = 'scripts.html';
         });
 
         // Add this helper function
